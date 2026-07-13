@@ -8,9 +8,9 @@
 - Never commit or expose secrets (tokens, API keys, passwords, cluster credentials, secret values).
 
 ## Guardrails (Single Source of Truth)
-- For permissions and runtime guardrails, always use `.guard/settings.json` and hooks in `.guard/hooks/`.
+- For permissions and runtime guardrails, always use `.claude/settings.json` and hooks in `.claude/hooks/`.
 - Do not duplicate permission or hook rules in other agent docs.
-- If any instruction conflicts with `.guard` enforcement, follow `.guard`.
+- If any instruction conflicts with `.claude` enforcement, follow `.claude`.
 
 
 ## Coding Style

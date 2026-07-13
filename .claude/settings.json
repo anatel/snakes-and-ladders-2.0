@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .guard/hooks/block-secret-file-access.js"
+            "command": "node .claude/hooks/block-secret-file-access.js"
           }
         ]
       },
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .guard/hooks/block-destructive-bash.js"
+            "command": "node .claude/hooks/block-destructive-bash.js"
           }
         ]
       },
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .guard/hooks/enforce-agent-boundaries.js"
+            "command": "node .claude/hooks/enforce-agent-boundaries.js"
           }
         ]
       }
