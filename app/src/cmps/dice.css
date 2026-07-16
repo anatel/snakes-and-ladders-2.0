@@ -1,0 +1,44 @@
+.dice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+
+  &:not(:disabled):hover {
+    transform: translateY(-2px) scale(1.03);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+  }
+
+  &.dice--rolling {
+    animation: dice-shake 0.3s ease-in-out infinite;
+  }
+}
+
+@keyframes dice-shake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-12deg) scale(1.05);
+  }
+  75% {
+    transform: rotate(12deg) scale(1.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dice.dice--rolling {
+    animation: none;
+  }
+}

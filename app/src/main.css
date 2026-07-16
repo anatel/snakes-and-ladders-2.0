@@ -1,0 +1,12 @@
+@import './setup/variables.css';
+@import './basics/reset.css';
+@import './cmps/game.css';
+@import './cmps/board.css';
+@import './cmps/piece.css';
+@import './cmps/dice.css';
+
+@media (max-width: 420px) {
+  :root {
+    --board-max-size: 94vw;
+  }
+}

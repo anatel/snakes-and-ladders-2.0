@@ -1,0 +1,20 @@
+.piece {
+  position: absolute;
+  width: 7%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transform: translate(-50%, -50%);
+  transition: top 0.4s ease, left 0.4s ease;
+
+  &.piece--human {
+    background: var(--color-human);
+    z-index: 2;
+  }
+
+  &.piece--computer {
+    background: var(--color-computer);
+    z-index: 1;
+  }
+}
