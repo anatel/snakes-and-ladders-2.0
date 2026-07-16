@@ -19,11 +19,11 @@ function otherPlayer(player: PlayerId): PlayerId {
   return player === 'human' ? 'computer' : 'human'
 }
 
-// Pure reducer step: given the roll for the current player, returns the
-// square they land on after movement and any snake/ladder resolution,
-// plus whether that roll wins the game. Movement/turn-switch is applied
-// by the caller so the UI can animate each step separately.
-export function resolveMove(state: GameState, roll: number): GameState {
+// First leg of a turn: move the current player by the roll amount only,
+// without resolving any snake/ladder yet. If the landing square starts a
+// snake or ladder, the turn stays open in the 'resolving-shortcut' phase
+// so the UI can show the piece land there before sliding further.
+export function applyStraightMove(state: GameState, roll: number): GameState {
   const from = state.positions[state.currentPlayer]
   const straightMove = from + roll
 
@@ -37,9 +37,6 @@ export function resolveMove(state: GameState, roll: number): GameState {
     }
   }
 
-  const shortcutTarget = getShortcut(straightMove)
-  const finalSquare = shortcutTarget ?? straightMove
-
   if (straightMove === BOARD_SIZE) {
     return {
       ...state,
@@ -50,10 +47,29 @@ export function resolveMove(state: GameState, roll: number): GameState {
     }
   }
 
+  const hasShortcut = getShortcut(straightMove) !== null
+
   return {
     ...state,
     lastRoll: roll,
-    positions: { ...state.positions, [state.currentPlayer]: finalSquare },
+    positions: { ...state.positions, [state.currentPlayer]: straightMove },
+    phase: hasShortcut ? 'resolving-shortcut' : 'awaiting-roll',
+    currentPlayer: hasShortcut ? state.currentPlayer : otherPlayer(state.currentPlayer)
+  }
+}
+
+// Second leg of a turn: called only while phase is 'resolving-shortcut',
+// after the UI has had time to animate the piece landing on the snake
+// head or ladder base. Slides the piece to the shortcut's destination
+// and passes the turn.
+export function applyShortcutResolution(state: GameState): GameState {
+  const square = state.positions[state.currentPlayer]
+  const destination = getShortcut(square)
+  if (destination === null) return state
+
+  return {
+    ...state,
+    positions: { ...state.positions, [state.currentPlayer]: destination },
     phase: 'awaiting-roll',
     currentPlayer: otherPlayer(state.currentPlayer)
   }
