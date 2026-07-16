@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { applyShortcutResolution, applyStraightMove, createInitialState, rollDie } from './gameLogic'
-import { playDiceRollSound } from './diceSound'
+import { LADDERS } from './board'
+import { playDiceRollSound, playLadderSound, playSnakeSound, playWinSound } from './sounds'
 import type { GameState } from './types'
 
 const ROLL_ANIMATION_MS = 600
@@ -12,6 +13,7 @@ export function useGame() {
   const [isRolling, setIsRolling] = useState(false)
   const rollTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const shortcutTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const winSoundPlayedRef = useRef(false)
 
   const roll = useCallback(() => {
     setIsRolling(true)
@@ -33,6 +35,14 @@ export function useGame() {
 
   useEffect(() => {
     if (state.phase !== 'resolving-shortcut') return
+
+    const square = state.positions[state.currentPlayer]
+    if (square in LADDERS) {
+      playLadderSound()
+    } else {
+      playSnakeSound()
+    }
+
     shortcutTimeoutRef.current = setTimeout(() => {
       setState((prev) => applyShortcutResolution(prev))
     }, SHORTCUT_PAUSE_MS)
@@ -47,9 +57,16 @@ export function useGame() {
     return () => clearTimeout(timer)
   }, [state.phase, state.currentPlayer, isRolling, roll])
 
+  useEffect(() => {
+    if (state.phase !== 'won' || winSoundPlayedRef.current) return
+    winSoundPlayedRef.current = true
+    playWinSound()
+  }, [state.phase])
+
   const reset = useCallback(() => {
     clearTimeout(rollTimeoutRef.current)
     clearTimeout(shortcutTimeoutRef.current)
+    winSoundPlayedRef.current = false
     setIsRolling(false)
     setState(createInitialState())
   }, [])
