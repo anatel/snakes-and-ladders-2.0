@@ -94,4 +94,19 @@ describe('applyShortcutResolution', () => {
     expect(next.phase).toBe('awaiting-roll')
     expect(next.currentPlayer).toBe('computer')
   })
+
+  it('declares a winner when a ladder climb lands exactly on square 100', () => {
+    // square 80 is a ladder base that climbs to square 100
+    const state = stateWith({
+      positions: { human: 80, computer: 0 },
+      currentPlayer: 'human',
+      phase: 'resolving-shortcut'
+    })
+
+    const next = applyShortcutResolution(state)
+
+    expect(next.positions.human).toBe(100)
+    expect(next.phase).toBe('won')
+    expect(next.winner).toBe('human')
+  })
 })

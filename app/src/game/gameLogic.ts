@@ -67,6 +67,15 @@ export function applyShortcutResolution(state: GameState): GameState {
   const destination = getShortcut(square)
   if (destination === null) return state
 
+  if (destination === BOARD_SIZE) {
+    return {
+      ...state,
+      positions: { ...state.positions, [state.currentPlayer]: BOARD_SIZE },
+      phase: 'won',
+      winner: state.currentPlayer
+    }
+  }
+
   return {
     ...state,
     positions: { ...state.positions, [state.currentPlayer]: destination },
