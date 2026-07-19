@@ -4,6 +4,7 @@ import { Board } from '../cmps/Board'
 import { Dice } from '../cmps/Dice'
 import { LADDERS } from '../game/board'
 import { playDiceRollSound, playLadderSound, playSnakeSound, playWinSound } from '../game/sounds'
+import { Chat } from './Chat'
 import type { GameStateView } from './protocol'
 
 const ROLL_ANIMATION_MS = 600
@@ -14,6 +15,7 @@ interface MultiplayerGameProps {
   myPlayerId: string
   onRoll: () => void
   onLeaveToLobby: () => void
+  onSendChatMessage: (text: string) => void
 }
 
 function useNow(intervalMs: number): number {
@@ -25,15 +27,19 @@ function useNow(intervalMs: number): number {
   return now
 }
 
-export function MultiplayerGame({ game, myPlayerId, onRoll, onLeaveToLobby }: MultiplayerGameProps) {
+export function MultiplayerGame({ game, myPlayerId, onRoll, onLeaveToLobby, onSendChatMessage }: MultiplayerGameProps) {
   const [isRolling, setIsRolling] = useState(false)
   const announcedShortcutKeyRef = useRef<string | null>(null)
   const announcedFinishedGameIdRef = useRef<string | null>(null)
   const now = useNow(CLOCK_TICK_MS)
 
   const currentPlayer = game.players.find((p) => p.id === game.currentPlayerId) ?? null
+  const myPlayer = game.players.find((p) => p.id === myPlayerId) ?? null
   const isMyTurn = game.status === 'in-progress' && game.currentPlayerId === myPlayerId
   const canRoll = isMyTurn && game.phase === 'awaiting-roll' && !isRolling
+  // Once a player has left (timed out or left deliberately) there's nothing
+  // left for them to do in this game beyond reading the chat log.
+  const isActivePlayer = myPlayer !== null && !myPlayer.isLeft
 
   const handleRoll = () => {
     setIsRolling(true)
@@ -89,54 +95,65 @@ export function MultiplayerGame({ game, myPlayerId, onRoll, onLeaveToLobby }: Mu
   })()
 
   return (
-    <div className="game">
-      <header className="game-header">
-        <h1 className="game-title">{game.name}</h1>
-        <p className="game-status">{statusText}</p>
-        {secondsLeft !== null && (
-          <p className="mp-turn-timer">
-            {currentPlayer?.id === myPlayerId ? 'Your' : `${currentPlayer?.name ?? ''}'s`} time left: {secondsLeft}s
-          </p>
-        )}
-      </header>
+    <div className="mp-layout">
+      <div className="game">
+        <header className="game-header">
+          <h1 className="game-title">{game.name}</h1>
+          <p className="game-status">{statusText}</p>
+          {secondsLeft !== null && (
+            <p className="mp-turn-timer">
+              {currentPlayer?.id === myPlayerId ? 'Your' : `${currentPlayer?.name ?? ''}'s`} time left: {secondsLeft}s
+            </p>
+          )}
+        </header>
 
-      <Board
-        pieces={game.players
-          .filter((player) => !player.isLeft)
-          .map((player) => ({
-            id: player.id,
-            colorIndex: player.colorIndex,
-            square: player.square,
-            label: player.name
-          }))}
-      />
+        <Board
+          pieces={game.players
+            .filter((player) => !player.isLeft)
+            .map((player) => ({
+              id: player.id,
+              colorIndex: player.colorIndex,
+              square: player.square,
+              label: player.name
+            }))}
+        />
 
-      <ul className="mp-player-list">
-        {game.players.map((player) => (
-          <li
-            key={player.id}
-            className={'mp-player' + (player.id === game.currentPlayerId ? ' mp-player--active' : '')}
-          >
-            <span className={`mp-player-dot piece--${player.colorIndex}`} />
-            <span className="mp-player-name">
-              {player.name}
-              {player.id === myPlayerId ? ' (you)' : ''}
-            </span>
-            {player.isLeft && <span className="mp-player-tag">left</span>}
-            {!player.isLeft && !player.isConnected && <span className="mp-player-tag">reconnecting...</span>}
-          </li>
-        ))}
-      </ul>
+        <ul className="mp-player-list">
+          {game.players.map((player) => (
+            <li
+              key={player.id}
+              className={'mp-player' + (player.id === game.currentPlayerId ? ' mp-player--active' : '')}
+            >
+              <span className={`mp-player-dot piece--${player.colorIndex}`} />
+              <span className="mp-player-name">
+                {player.name}
+                {player.id === myPlayerId ? ' (you)' : ''}
+              </span>
+              {player.isLeft && <span className="mp-player-tag">left</span>}
+              {!player.isLeft && !player.isConnected && <span className="mp-player-tag">reconnecting...</span>}
+            </li>
+          ))}
+        </ul>
 
-      <footer className="game-footer">
-        {game.status === 'in-progress' ? (
-          <Dice value={game.lastRoll} isRolling={isRolling} canRoll={canRoll} onRoll={handleRoll} />
-        ) : (
-          <button type="button" className="game-reset" onClick={onLeaveToLobby}>
-            Back to lobby
-          </button>
-        )}
-      </footer>
+        <footer className="game-footer">
+          {game.status === 'in-progress' ? (
+            <>
+              <Dice value={game.lastRoll} isRolling={isRolling} canRoll={canRoll} onRoll={handleRoll} />
+              {isActivePlayer && (
+                <button type="button" className="mp-link-button" onClick={onLeaveToLobby}>
+                  Leave game
+                </button>
+              )}
+            </>
+          ) : (
+            <button type="button" className="game-reset" onClick={onLeaveToLobby}>
+              Back to lobby
+            </button>
+          )}
+        </footer>
+      </div>
+
+      <Chat messages={game.chatMessages} myPlayerId={myPlayerId} canSend={isActivePlayer} onSend={onSendChatMessage} />
     </div>
   )
 }

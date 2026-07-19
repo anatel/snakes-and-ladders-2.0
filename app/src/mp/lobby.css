@@ -1,8 +1,10 @@
 .mp-lobby {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--space-lg);
   width: min(100%, 480px);
+  min-height: 100%;
   margin: 0 auto;
   padding: var(--space-lg) var(--space-md) var(--space-xl);
   color: var(--color-text-inverse);

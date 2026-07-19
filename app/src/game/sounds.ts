@@ -124,6 +124,68 @@ export function playSnakeSound(): void {
   vibrato.stop(startTime + duration + 0.02)
 }
 
+// Soft, quick blip - a new chat message from another player. Deliberately
+// unobtrusive since it can fire often.
+export function playChatMessageSound(): void {
+  const ctx = getAudioContext()
+  playTone(ctx, 880, ctx.currentTime, 0.09, 'sine', 0.16)
+}
+
+// Two-note upward chime - a player joined the game. Shorter and quieter
+// than playLadderSound so it reads as a notification, not a game event.
+export function playPlayerJoinedSound(): void {
+  const ctx = getAudioContext()
+  let time = ctx.currentTime
+  for (const freq of [523.25, 783.99]) {
+    // C5, G5
+    playTone(ctx, freq, time, 0.11, 'triangle', 0.2)
+    time += 0.08
+  }
+}
+
+// Two-note downward tone - another player left the game. Mellow, not
+// alarming, since it isn't about the listener.
+export function playPlayerLeftSound(): void {
+  const ctx = getAudioContext()
+  let time = ctx.currentTime
+  for (const freq of [523.25, 349.23]) {
+    // C5, F4
+    playTone(ctx, freq, time, 0.13, 'sine', 0.2)
+    time += 0.09
+  }
+}
+
+// A more pointed descending buzz, reserved for when *you* are the one
+// removed from the game (turn timeout) - distinct from the softer
+// playPlayerLeftSound used when someone else leaves.
+export function playRemovedFromGameSound(): void {
+  const ctx = getAudioContext()
+  const startTime = ctx.currentTime
+  const duration = 0.4
+
+  const osc = ctx.createOscillator()
+  osc.type = 'square'
+  osc.frequency.setValueAtTime(392, startTime) // G4
+  osc.frequency.exponentialRampToValueAtTime(130, startTime + duration)
+
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.setValueAtTime(1200, startTime)
+  filter.frequency.exponentialRampToValueAtTime(250, startTime + duration)
+
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0.001, startTime)
+  gain.gain.exponentialRampToValueAtTime(0.22, startTime + 0.02)
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration)
+
+  osc.connect(filter)
+  filter.connect(gain)
+  gain.connect(ctx.destination)
+
+  osc.start(startTime)
+  osc.stop(startTime + duration + 0.02)
+}
+
 // Triumphant rising arpeggio that resolves into a held major chord - the
 // fanfare feeling of winning the game.
 export function playWinSound(): void {

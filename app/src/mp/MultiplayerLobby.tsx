@@ -35,6 +35,10 @@ export function MultiplayerLobby({
         </button>
       </header>
 
+      {status !== 'open' && (
+        <p className="mp-empty">{status === 'connecting' ? 'Connecting...' : 'Disconnected - reconnecting...'}</p>
+      )}
+
       <label className="mp-field">
         Your name
         <input

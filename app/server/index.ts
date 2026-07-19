@@ -8,8 +8,10 @@ import {
   handleDisconnect,
   handleReconnect,
   joinGame,
+  leaveGame,
   listOpenGames,
   onGameChange,
+  postChatMessage,
   startGame
 } from './gameStore'
 import type { ClientMessage, ServerMessage } from '../src/mp/protocol'
@@ -104,6 +106,17 @@ wss.on('connection', (socket) => {
         case 'roll': {
           if (!requireOwnIdentity(socket, message.gameId, message.playerId)) break
           applyRoll(message.gameId, message.playerId)
+          break
+        }
+        case 'send-chat-message': {
+          if (!requireOwnIdentity(socket, message.gameId, message.playerId)) break
+          postChatMessage(message.gameId, message.playerId, message.text)
+          break
+        }
+        case 'leave-game': {
+          if (!requireOwnIdentity(socket, message.gameId, message.playerId)) break
+          leaveGame(message.gameId, message.playerId)
+          identities.delete(socket)
           break
         }
       }

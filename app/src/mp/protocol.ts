@@ -9,6 +9,9 @@ export const TURN_TIMEOUT_MS = 60_000
 
 export const SHORTCUT_PAUSE_MS = 550
 
+export const MAX_CHAT_MESSAGE_LENGTH = 500
+export const MAX_CHAT_HISTORY = 200
+
 export type GameStatus = 'waiting' | 'in-progress' | 'finished'
 export type TurnPhase = 'awaiting-roll' | 'resolving-shortcut'
 export type WinReason = 'reached-100' | 'last-player-standing'
@@ -29,6 +32,24 @@ export interface GameSummary {
   maxPlayers: number
 }
 
+// 'system' messages (e.g. "Alice left the game.") aren't typed by any
+// player - the client renders them as a plain announcement rather than
+// attributing them to someone. playerId/playerName/colorIndex still
+// identify who the event is *about*, so a client can tell whether it was
+// about them (e.g. to pick a sound) without string-matching the text.
+export type ChatMessageView =
+  | { id: string; kind: 'message'; playerId: string; playerName: string; colorIndex: number; text: string; sentAt: number }
+  | {
+      id: string
+      kind: 'system'
+      event: 'joined' | 'left'
+      playerId: string
+      playerName: string
+      colorIndex: number
+      text: string
+      sentAt: number
+    }
+
 export interface GameStateView {
   id: string
   name: string
@@ -40,6 +61,7 @@ export interface GameStateView {
   lastRoll: number | null
   winnerId: string | null
   winReason: WinReason | null
+  chatMessages: ChatMessageView[]
 }
 
 export type ClientMessage =
@@ -49,6 +71,8 @@ export type ClientMessage =
   | { type: 'reconnect'; gameId: string; playerId: string; token: string }
   | { type: 'start-game'; gameId: string; playerId: string }
   | { type: 'roll'; gameId: string; playerId: string }
+  | { type: 'send-chat-message'; gameId: string; playerId: string; text: string }
+  | { type: 'leave-game'; gameId: string; playerId: string }
 
 export type ServerMessage =
   | { type: 'games-list'; games: GameSummary[] }

@@ -31,7 +31,10 @@
   --shadow-md: 0 10px 30px rgba(15, 10, 46, 0.25);
   --shadow-sm: 0 2px 8px rgba(15, 10, 46, 0.15);
 
-  --board-max-size: min(92vw, 640px);
+  /* Bounded by both viewport width and height so the header/player-list/dice
+     around the board never get pushed below the fold - 26rem is the
+     estimated height of that surrounding chrome. */
+  --board-max-size: min(92vw, 640px, calc(100dvh - 26rem));
 }
 
 @media (prefers-color-scheme: dark) {

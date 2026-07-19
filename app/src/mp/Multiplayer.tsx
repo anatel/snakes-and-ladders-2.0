@@ -8,8 +8,20 @@ interface MultiplayerProps {
 }
 
 export function Multiplayer({ onExit }: MultiplayerProps) {
-  const { status, error, gamesList, game, myPlayerId, refreshGamesList, createGame, joinGame, startGame, roll, leaveToLobby } =
-    useMultiplayerGame()
+  const {
+    status,
+    error,
+    gamesList,
+    game,
+    myPlayerId,
+    refreshGamesList,
+    createGame,
+    joinGame,
+    startGame,
+    roll,
+    sendChatMessage,
+    leaveToLobby
+  } = useMultiplayerGame()
 
   if (!game || !myPlayerId) {
     return (
@@ -26,8 +38,24 @@ export function Multiplayer({ onExit }: MultiplayerProps) {
   }
 
   if (game.status === 'waiting') {
-    return <WaitingRoom game={game} myPlayerId={myPlayerId} onStart={startGame} onLeave={leaveToLobby} />
+    return (
+      <WaitingRoom
+        game={game}
+        myPlayerId={myPlayerId}
+        onStart={startGame}
+        onLeave={leaveToLobby}
+        onSendChatMessage={sendChatMessage}
+      />
+    )
   }
 
-  return <MultiplayerGame game={game} myPlayerId={myPlayerId} onRoll={roll} onLeaveToLobby={leaveToLobby} />
+  return (
+    <MultiplayerGame
+      game={game}
+      myPlayerId={myPlayerId}
+      onRoll={roll}
+      onLeaveToLobby={leaveToLobby}
+      onSendChatMessage={sendChatMessage}
+    />
+  )
 }

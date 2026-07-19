@@ -4,7 +4,6 @@
   align-items: center;
   gap: var(--space-md);
   width: min(100%, 420px);
-  margin: 0 auto;
   padding: var(--space-lg) var(--space-md) var(--space-xl);
   text-align: center;
   color: var(--color-text-inverse);

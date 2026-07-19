@@ -1,16 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { TURN_TIMEOUT_MS } from '../src/mp/protocol'
+import { MAX_CHAT_HISTORY, MAX_CHAT_MESSAGE_LENGTH, TURN_TIMEOUT_MS } from '../src/mp/protocol'
 import {
   DomainError,
   __resetForTests,
   applyRoll,
   computeStraightMove,
   createGame,
+  getConnections,
   getGame,
   handleDisconnect,
   handleReconnect,
   joinGame,
+  leaveGame,
   listOpenGames,
+  postChatMessage,
   startGame,
   type Connection
 } from './gameStore'
@@ -114,6 +117,23 @@ describe('createGame / joinGame / startGame', () => {
     expect(started.currentPlayerId).toBe(aId)
     expect(started.turnEndsAt).toBe(Date.now() + TURN_TIMEOUT_MS)
   })
+
+  it('posts a system chat message announcing each player who joins, including the creator', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+    const bob = joinGame(created.game.id, 'Bob', fakeConnection())
+
+    expect(bob.game.chatMessages).toContainEqual(
+      expect.objectContaining({
+        kind: 'system',
+        event: 'joined',
+        playerId: created.playerId,
+        text: 'Alice joined the game.'
+      })
+    )
+    expect(bob.game.chatMessages).toContainEqual(
+      expect.objectContaining({ kind: 'system', event: 'joined', playerId: bob.playerId, text: 'Bob joined the game.' })
+    )
+  })
 })
 
 describe('turn timeout', () => {
@@ -140,6 +160,103 @@ describe('turn timeout', () => {
     expect(game.status).toBe('finished')
     expect(game.winnerId).toBe(bId)
     expect(game.winReason).toBe('last-player-standing')
+  })
+
+  it('posts a system chat message announcing the timed-out player left', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+    joinGame(created.game.id, 'Bob', fakeConnection())
+    startGame(created.game.id, created.playerId)
+
+    vi.advanceTimersByTime(TURN_TIMEOUT_MS)
+
+    const game = getGame(created.game.id)!
+    expect(game.chatMessages).toContainEqual(
+      expect.objectContaining({ kind: 'system', event: 'left', playerId: created.playerId, text: 'Alice left the game.' })
+    )
+  })
+
+  it('keeps the timed-out player connected as a spectator instead of cutting off their broadcasts', () => {
+    // If their connection were dropped here, their own client would never
+    // receive the game-state update telling it they were removed - it'd
+    // just go stale with no way to show "you left" or play a sound for it.
+    const { gameId, aId } = setUpTwoPlayerGame()
+
+    vi.advanceTimersByTime(TURN_TIMEOUT_MS)
+
+    const connections = getConnections(gameId)
+    expect(connections).toHaveLength(2)
+  })
+})
+
+describe('leaveGame', () => {
+  it('removes the current player immediately, without waiting for the turn timer', () => {
+    const { gameId, aId, bId } = setUpTwoPlayerGame()
+
+    leaveGame(gameId, aId)
+
+    const game = getGame(gameId)!
+    expect(game.players.find((p) => p.id === aId)?.isLeft).toBe(true)
+    expect(game.status).toBe('finished')
+    expect(game.winnerId).toBe(bId)
+    expect(game.winReason).toBe('last-player-standing')
+    expect(game.chatMessages).toContainEqual(
+      expect.objectContaining({ kind: 'system', event: 'left', playerId: aId, text: 'Alice left the game.' })
+    )
+  })
+
+  it("detaches the leaving player's own connection, unlike a timeout removal", () => {
+    const created = createGame('Trio', 'Alice', fakeConnection())
+    joinGame(created.game.id, 'Bob', fakeConnection())
+    joinGame(created.game.id, 'Carol', fakeConnection())
+    startGame(created.game.id, created.playerId)
+
+    leaveGame(created.game.id, created.playerId)
+
+    expect(getConnections(created.game.id)).toHaveLength(2)
+  })
+
+  it('does not disturb the turn when a player who is not up right now leaves', () => {
+    const created = createGame('Trio', 'Alice', fakeConnection())
+    joinGame(created.game.id, 'Bob', fakeConnection())
+    const carol = joinGame(created.game.id, 'Carol', fakeConnection())
+    const started = startGame(created.game.id, created.playerId)
+
+    leaveGame(created.game.id, carol.playerId)
+
+    const game = getGame(created.game.id)!
+    expect(game.players.find((p) => p.id === carol.playerId)?.isLeft).toBe(true)
+    expect(game.currentPlayerId).toBe(started.currentPlayerId)
+    expect(game.turnEndsAt).toBe(started.turnEndsAt)
+  })
+
+  it('frees the slot when leaving before the game starts, same as a disconnect', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+    joinGame(created.game.id, 'Bob', fakeConnection())
+
+    leaveGame(created.game.id, created.playerId)
+
+    const game = getGame(created.game.id)!
+    expect(game.players.map((p) => p.name)).toEqual(['Bob'])
+  })
+
+  it('is a no-op if the player already left', () => {
+    // Trio, not a pair, so the game is still in-progress (not finished)
+    // after Alice's removal - otherwise the status check alone would skip
+    // the second call and this wouldn't actually exercise the isLeft guard.
+    const created = createGame('Trio', 'Alice', fakeConnection())
+    joinGame(created.game.id, 'Bob', fakeConnection())
+    joinGame(created.game.id, 'Carol', fakeConnection())
+    startGame(created.game.id, created.playerId)
+
+    vi.advanceTimersByTime(TURN_TIMEOUT_MS) // times out and removes Alice, turn passes to Bob
+    const afterTimeout = getGame(created.game.id)!
+    expect(afterTimeout.status).toBe('in-progress')
+
+    leaveGame(created.game.id, created.playerId) // Alice "leaves" again after already being removed
+
+    const game = getGame(created.game.id)!
+    expect(game.currentPlayerId).toBe(afterTimeout.currentPlayerId)
+    expect(game.chatMessages.filter((m) => m.kind === 'system' && m.text === 'Alice left the game.')).toHaveLength(1)
   })
 })
 
@@ -221,6 +338,66 @@ describe('applyRoll', () => {
   })
 })
 
+describe('postChatMessage', () => {
+  it('appends a trimmed message from a player in the game and broadcasts', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+    const bob = joinGame(created.game.id, 'Bob', fakeConnection())
+
+    const game = postChatMessage(created.game.id, bob.playerId, '  hi there  ')
+
+    // Not the only message - createGame/joinGame already posted their own
+    // "joined" system messages - so check the newly-appended tail rather
+    // than assuming an exact history length.
+    expect(game.chatMessages[game.chatMessages.length - 1]).toMatchObject({
+      kind: 'message',
+      playerId: bob.playerId,
+      playerName: 'Bob',
+      colorIndex: 1,
+      text: 'hi there'
+    })
+  })
+
+  it('rejects an empty or whitespace-only message', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+    expect(() => postChatMessage(created.game.id, created.playerId, '   ')).toThrow('empty')
+  })
+
+  it('rejects a message longer than the max length', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+    const tooLong = 'a'.repeat(MAX_CHAT_MESSAGE_LENGTH + 1)
+    expect(() => postChatMessage(created.game.id, created.playerId, tooLong)).toThrow('longer than')
+  })
+
+  it('rejects a sender who is not a player in the game', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+    expect(() => postChatMessage(created.game.id, 'not-a-real-player-id', 'hi')).toThrow('Not a player')
+  })
+
+  it('rejects a message from a player who has left the game', () => {
+    const created = createGame('Trio', 'Alice', fakeConnection())
+    joinGame(created.game.id, 'Bob', fakeConnection())
+    joinGame(created.game.id, 'Carol', fakeConnection())
+    startGame(created.game.id, created.playerId)
+
+    vi.advanceTimersByTime(TURN_TIMEOUT_MS) // times out Alice's turn, marking her isLeft
+
+    expect(() => postChatMessage(created.game.id, created.playerId, 'still here?')).toThrow('left this game')
+  })
+
+  it('caps history at the max length, dropping the oldest messages', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+
+    for (let i = 0; i < MAX_CHAT_HISTORY + 5; i++) {
+      postChatMessage(created.game.id, created.playerId, `message ${i}`)
+    }
+
+    const game = getGame(created.game.id)!
+    expect(game.chatMessages).toHaveLength(MAX_CHAT_HISTORY)
+    expect(game.chatMessages[0].text).toBe('message 5')
+    expect(game.chatMessages[game.chatMessages.length - 1].text).toBe(`message ${MAX_CHAT_HISTORY + 4}`)
+  })
+})
+
 describe('waiting-room disconnects', () => {
   it('frees the slot when a player disconnects before the game starts', () => {
     const created = createGame('Game', 'Alice', fakeConnection())
@@ -231,6 +408,18 @@ describe('waiting-room disconnects', () => {
     const game = getGame(created.game.id)!
     expect(game.players.map((p) => p.name)).toEqual(['Bob'])
     expect(listOpenGames().find((g) => g.id === created.game.id)?.playerCount).toBe(1)
+  })
+
+  it('posts a system chat message announcing the player left', () => {
+    const created = createGame('Game', 'Alice', fakeConnection())
+    joinGame(created.game.id, 'Bob', fakeConnection())
+
+    handleDisconnect(created.game.id, created.playerId)
+
+    const game = getGame(created.game.id)!
+    expect(game.chatMessages).toContainEqual(
+      expect.objectContaining({ kind: 'system', event: 'left', playerId: created.playerId, text: 'Alice left the game.' })
+    )
   })
 
   it('deletes the game once every waiting player has disconnected', () => {

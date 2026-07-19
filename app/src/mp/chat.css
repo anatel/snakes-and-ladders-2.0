@@ -1,0 +1,105 @@
+/* The chat panel is deliberately taken out of normal flow on wide screens
+   (position: fixed below) so it never competes with the game/waiting-room
+   column for width or pushes it off-center - it's a small overlay pinned to
+   the side, not a layout sibling. On narrow screens there's no room for a
+   side panel, so it falls back to a normal stacked card underneath. */
+.mp-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  width: 100%;
+  min-height: 100%;
+}
+
+.mp-chat {
+  width: min(100%, 420px);
+}
+
+.mp-chat-messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1;
+  min-height: 6rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+
+/* Wide enough for a centered ~640px board plus a 260px side panel without
+   the two ever overlapping. */
+@media (min-width: 1300px) {
+  .mp-chat {
+    position: fixed;
+    top: var(--space-lg);
+    right: var(--space-lg);
+    bottom: var(--space-lg);
+    width: 260px;
+  }
+
+  .mp-chat-messages {
+    max-height: none;
+  }
+}
+
+.mp-chat-message {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-square-light);
+  font-size: 0.9rem;
+
+  &.mp-chat-message--mine {
+    background: var(--color-ladder-square);
+  }
+}
+
+.mp-chat-system {
+  text-align: center;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+.mp-chat-sender {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.mp-chat-text {
+  overflow-wrap: anywhere;
+}
+
+.mp-chat-form {
+  display: flex;
+  gap: var(--space-sm);
+
+  input {
+    flex: 1;
+    padding: var(--space-sm);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-square-dark);
+    font: inherit;
+  }
+
+  button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-sm);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--color-accent);
+    color: var(--color-text-inverse);
+
+    &:disabled {
+      opacity: 0.5;
+    }
+  }
+}

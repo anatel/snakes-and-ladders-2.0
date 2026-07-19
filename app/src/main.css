@@ -9,6 +9,7 @@
 @import './mp/waiting-room.css';
 @import './mp/players.css';
 @import './mp/multiplayer-game.css';
+@import './mp/chat.css';
 
 @media (max-width: 420px) {
   :root {

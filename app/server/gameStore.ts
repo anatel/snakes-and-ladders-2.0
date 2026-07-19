@@ -2,10 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { BOARD_SIZE, getShortcut } from '../src/game/board'
 import { rollDie } from '../src/game/gameLogic'
 import {
+  MAX_CHAT_HISTORY,
+  MAX_CHAT_MESSAGE_LENGTH,
   MAX_PLAYERS,
   MIN_PLAYERS_TO_START,
   SHORTCUT_PAUSE_MS,
   TURN_TIMEOUT_MS,
+  type ChatMessageView,
   type GameStateView,
   type GameSummary,
   type GameStatus,
@@ -42,6 +45,7 @@ interface Game {
   lastRoll: number | null
   winnerId: string | null
   winReason: WinReason | null
+  chatMessages: ChatMessageView[]
 }
 
 export class DomainError extends Error {}
@@ -152,17 +156,54 @@ function handleTurnTimeout(game: Game, player: Player): void {
   if (game.status !== 'in-progress') return
   if (currentPlayer(game) !== player) return
   if (player.isLeft) return
-  removePlayer(game, player)
+  // detachSocket: false - the player stays connected as a read-only
+  // spectator so their own client actually finds out it was removed (and
+  // can play a distinct "you were removed" sound) instead of going dark.
+  removePlayer(game, player, { detachSocket: false })
 }
 
-function removePlayer(game: Game, player: Player): void {
+function appendChatMessage(game: Game, message: ChatMessageView): void {
+  game.chatMessages.push(message)
+  if (game.chatMessages.length > MAX_CHAT_HISTORY) {
+    game.chatMessages.splice(0, game.chatMessages.length - MAX_CHAT_HISTORY)
+  }
+}
+
+function pushSystemMessage(game: Game, event: 'joined' | 'left', player: Player, text: string): void {
+  appendChatMessage(game, {
+    id: randomUUID(),
+    kind: 'system',
+    event,
+    playerId: player.id,
+    playerName: player.name,
+    colorIndex: player.colorIndex,
+    text,
+    sentAt: Date.now()
+  })
+}
+
+// Handles removing any active player, not just the one currently on the
+// clock (a player can now leave deliberately regardless of whose turn it
+// is, via leaveGame, in addition to the original timeout path where it's
+// always the current player). Only advance/restart the turn clock when the
+// player being removed was actually the one it was waiting on - removing a
+// player who isn't up right now must leave the current turn undisturbed.
+//
+// detachSocket controls whether the removed player keeps receiving further
+// broadcasts for this game: a deliberate leaveGame call detaches them (their
+// client has already navigated away, and shouldn't be pulled back into a
+// game it just left), while a timeout removal keeps them attached so they
+// still see the game they're now spectating (and hear that they left it).
+function removePlayer(game: Game, player: Player, options: { detachSocket: boolean }): void {
+  const wasCurrentPlayer = currentPlayer(game) === player
   player.isLeft = true
-  player.socket = null
+  if (options.detachSocket) player.socket = null
+  pushSystemMessage(game, 'left', player, `${player.name} left the game.`)
 
   const remaining = activePlayers(game)
   if (remaining.length <= 1) {
     finishGame(game, remaining[0]?.id ?? null, 'last-player-standing')
-  } else {
+  } else if (wasCurrentPlayer) {
     game.currentPlayerIndex = nextActiveIndex(game, game.currentPlayerIndex)
     startTurn(game)
   }
@@ -180,6 +221,7 @@ function addPlayer(game: Game, name: string, connection: Connection): Player {
     socket: connection
   }
   game.players.push(player)
+  pushSystemMessage(game, 'joined', player, `${player.name} joined the game.`)
   notifyChange(game.id)
   return player
 }
@@ -217,7 +259,8 @@ export function createGame(
     shortcutTimer: null,
     lastRoll: null,
     winnerId: null,
-    winReason: null
+    winReason: null,
+    chatMessages: []
   }
   games.set(game.id, game)
   const player = addPlayer(game, trimmedPlayer, connection)
@@ -306,6 +349,32 @@ function resolveShortcut(game: Game, player: Player, destination: number): void 
   notifyChange(game.id)
 }
 
+export function postChatMessage(gameId: string, playerId: string, text: string): GameStateView {
+  const game = requireGame(gameId)
+  const player = game.players.find((p) => p.id === playerId)
+  if (!player) throw new DomainError('Not a player in this game')
+  if (player.isLeft) throw new DomainError('You have left this game and cannot send messages')
+
+  const trimmed = text.trim()
+  if (!trimmed) throw new DomainError('Message cannot be empty')
+  if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+    throw new DomainError(`Message cannot be longer than ${MAX_CHAT_MESSAGE_LENGTH} characters`)
+  }
+
+  appendChatMessage(game, {
+    id: randomUUID(),
+    kind: 'message',
+    playerId: player.id,
+    playerName: player.name,
+    colorIndex: player.colorIndex,
+    text: trimmed,
+    sentAt: Date.now()
+  })
+
+  notifyChange(game.id)
+  return serializeGame(game)
+}
+
 export function handleReconnect(
   gameId: string,
   playerId: string,
@@ -326,6 +395,22 @@ export function handleReconnect(
   return serializeGame(game)
 }
 
+// No seat worth preserving before the game has started - free the slot
+// outright rather than just marking it disconnected.
+function removeFromWaitingRoom(game: Game, player: Player): void {
+  game.players = game.players.filter((p) => p.id !== player.id)
+  if (game.players.length === 0) {
+    games.delete(game.id)
+    return
+  }
+  pushSystemMessage(game, 'left', player, `${player.name} left the game.`)
+  notifyChange(game.id)
+}
+
+// A real socket disconnect (closed tab, dropped connection) - the player
+// might just be reloading, so an in-progress/finished game only detaches
+// the socket and preserves their seat for the reconnect-within-the-timeout
+// window. Contrast with leaveGame below, which is a deliberate departure.
 export function handleDisconnect(gameId: string, playerId: string): void {
   const game = games.get(gameId)
   if (!game) return
@@ -333,13 +418,35 @@ export function handleDisconnect(gameId: string, playerId: string): void {
   if (!player) return
 
   if (game.status === 'waiting') {
-    // No seat worth preserving before the game has started - free the slot.
-    game.players = game.players.filter((p) => p.id !== playerId)
-    if (game.players.length === 0) {
-      games.delete(gameId)
-      return
-    }
-    notifyChange(game.id)
+    removeFromWaitingRoom(game, player)
+    return
+  }
+
+  player.socket = null
+  notifyChange(game.id)
+}
+
+// A deliberate "leave game" action from the player themselves (as opposed
+// to a passive socket close) - mid-game this removes them immediately
+// instead of waiting out the turn timer, per the same rules as a
+// turn-timeout removal (advances the turn / ends the game if only one
+// active player remains).
+export function leaveGame(gameId: string, playerId: string): void {
+  const game = games.get(gameId)
+  if (!game) return
+  const player = game.players.find((p) => p.id === playerId)
+  if (!player) return
+
+  if (game.status === 'waiting') {
+    removeFromWaitingRoom(game, player)
+    return
+  }
+
+  if (game.status === 'in-progress' && !player.isLeft) {
+    // detachSocket: true - this player deliberately navigated away
+    // (leaveToLobby already reset their local state), so stop sending them
+    // updates for a game they're no longer looking at.
+    removePlayer(game, player, { detachSocket: true })
     return
   }
 
@@ -376,7 +483,8 @@ function serializeGame(game: Game): GameStateView {
     turnEndsAt: game.turnEndsAt,
     lastRoll: game.lastRoll,
     winnerId: game.winnerId,
-    winReason: game.winReason
+    winReason: game.winReason,
+    chatMessages: game.chatMessages
   }
 }
 

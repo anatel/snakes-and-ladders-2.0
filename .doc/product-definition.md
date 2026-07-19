@@ -36,10 +36,12 @@
 	- Online multiplayer: a player enters a display name; for multiplayer they create a named game or pick one to join from a list of open games, up to 4 players per game.
 	- Turn timeout: a player who hasn't taken their turn within 1 minute (including one who has left the page) is automatically removed from the game; if that leaves exactly one player remaining, that player is declared the winner.
 	- Reconnection: a player who leaves the page and returns within that same 1-minute window can rejoin the same game and resume their turn, instead of being removed.
+	- In-game chat: players in the same multiplayer game can send each other short text messages, visible to all players in that game, so they can chat while they play.
 - Out of scope:
 	- User accounts, profiles, or persistent stats/history.
 	- Customizable board layouts, themes, or difficulty levels.
-	- Chat, social features, or leaderboards.
+	- Social features (friends lists, profiles) or leaderboards.
+	- Chat persistence beyond the life of a game, or chat between players who are not in the same game.
 
 ## Success Metrics
 - Business metrics:
@@ -61,6 +63,7 @@
 	- Users are fine with a single classic board layout for the first release.
 	- A player is identified only by the display name they enter for that game (no accounts/authentication) is sufficient for multiplayer.
 	- 1 minute of turn inactivity before auto-removal is long enough for a normal human turn without being overly punishing.
+	- No moderation/profanity filtering on chat is acceptable for the first release, since games are small (up to 4 players) and self-hosted among people who chose to play together.
 
 ## Prioritization Rules
 - Prioritize the core game loop (roll, move, resolve snake/ladder, win/lose) working flawlessly before visual polish.
