@@ -1,10 +1,10 @@
 import { Toaster } from 'sonner'
-import { Game } from './cmps/Game'
+import { ModeSelect } from './cmps/ModeSelect'
 
 export function App() {
   return (
     <>
-      <Game />
+      <ModeSelect />
       <Toaster position="top-center" richColors />
     </>
   )

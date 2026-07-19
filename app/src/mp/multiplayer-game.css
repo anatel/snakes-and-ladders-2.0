@@ -1,0 +1,6 @@
+.mp-turn-timer {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-inverse);
+  opacity: 0.75;
+}

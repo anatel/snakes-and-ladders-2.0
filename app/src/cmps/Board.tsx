@@ -1,9 +1,15 @@
 import { BOARD_SIZE, LADDERS, SNAKES, getSquareCenterPercent, getSquarePosition } from '../game/board'
 import { Piece } from './Piece'
-import type { PlayerId } from '../game/types'
+
+export interface BoardPiece {
+  id: string
+  colorIndex: number
+  square: number
+  label: string
+}
 
 interface BoardProps {
-  positions: Record<PlayerId, number>
+  pieces: BoardPiece[]
 }
 
 const squares = Array.from({ length: BOARD_SIZE }, (_, i) => i + 1)
@@ -22,7 +28,7 @@ function Connector({ from, to, kind }: { from: number; to: number; kind: 'ladder
   )
 }
 
-export function Board({ positions }: BoardProps) {
+export function Board({ pieces }: BoardProps) {
   return (
     <div className="board">
       <div className="board-grid">
@@ -58,8 +64,9 @@ export function Board({ positions }: BoardProps) {
       </svg>
 
       <div className="board-pieces">
-        <Piece player="human" square={positions.human} />
-        <Piece player="computer" square={positions.computer} />
+        {pieces.map((piece) => (
+          <Piece key={piece.id} colorIndex={piece.colorIndex} square={piece.square} label={piece.label} />
+        ))}
       </div>
     </div>
   )

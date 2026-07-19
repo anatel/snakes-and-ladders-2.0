@@ -8,13 +8,23 @@
   transform: translate(-50%, -50%);
   transition: top 0.4s ease, left 0.4s ease;
 
-  &.piece--human {
+  &.piece--0 {
     background: var(--color-human);
+    z-index: 4;
+  }
+
+  &.piece--1 {
+    background: var(--color-computer);
+    z-index: 3;
+  }
+
+  &.piece--2 {
+    background: var(--color-player-2);
     z-index: 2;
   }
 
-  &.piece--computer {
-    background: var(--color-computer);
+  &.piece--3 {
+    background: var(--color-player-3);
     z-index: 1;
   }
 }

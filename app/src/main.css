@@ -4,6 +4,11 @@
 @import './cmps/board.css';
 @import './cmps/piece.css';
 @import './cmps/dice.css';
+@import './cmps/mode-select.css';
+@import './mp/lobby.css';
+@import './mp/waiting-room.css';
+@import './mp/players.css';
+@import './mp/multiplayer-game.css';
 
 @media (max-width: 420px) {
   :root {

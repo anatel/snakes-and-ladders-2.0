@@ -11,6 +11,7 @@
 - Primary users:
 	- Casual players looking for a quick, relaxing game during a short break.
 	- Nostalgic players who grew up playing the physical board game and want a digital version.
+	- Groups of friends or family who want to play together online, each from their own device.
 - Secondary users:
 	- Players introducing the game to kids or non-gamers, drawn to its simple rules and visual appeal.
 
@@ -31,7 +32,10 @@
 	- Win/lose end state with a clear message and option to start a new game.
 	- Responsive layout that works well on both desktop and mobile screens.
 	- Visually polished UI: styled board, pieces, snakes, ladders, and dice.
-	- Play modes: starting with player vs. computer, expanding over time to human vs. human (local and/or online multiplayer).
+	- Play modes: on entry, a player chooses player vs. computer or online multiplayer.
+	- Online multiplayer: a player enters a display name; for multiplayer they create a named game or pick one to join from a list of open games, up to 4 players per game.
+	- Turn timeout: a player who hasn't taken their turn within 1 minute (including one who has left the page) is automatically removed from the game; if that leaves exactly one player remaining, that player is declared the winner.
+	- Reconnection: a player who leaves the page and returns within that same 1-minute window can rejoin the same game and resume their turn, instead of being removed.
 - Out of scope:
 	- User accounts, profiles, or persistent stats/history.
 	- Customizable board layouts, themes, or difficulty levels.
@@ -44,15 +48,19 @@
 	- Game completion rate (players who finish a game once started).
 	- Perceived responsiveness and polish (no layout breakage across common screen sizes).
 	- Dice sound and animation firing correctly on every roll.
+	- Multiplayer game creation/join success rate, and rate of games won by timeout-forfeit vs. by reaching square 100.
 - Define baseline and target values once the product is live and usage data is available.
 
 ## Constraints and Assumptions
 - Key constraints:
 	- Must run in a standard web browser with responsive design (no native app).
 	- Audio playback (dice sound) must work within typical browser autoplay/user-interaction policies.
+	- Online multiplayer requires synchronizing game state and turn timing across players in real time, unlike the fully client-side single-player mode.
 - Assumptions to validate:
 	- A simple, randomized computer opponent (no real strategy needed, since the game has no player decisions beyond rolling) is sufficient while player vs. computer is the only mode.
 	- Users are fine with a single classic board layout for the first release.
+	- A player is identified only by the display name they enter for that game (no accounts/authentication) is sufficient for multiplayer.
+	- 1 minute of turn inactivity before auto-removal is long enough for a normal human turn without being overly punishing.
 
 ## Prioritization Rules
 - Prioritize the core game loop (roll, move, resolve snake/ladder, win/lose) working flawlessly before visual polish.

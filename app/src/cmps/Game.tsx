@@ -51,7 +51,12 @@ export function Game() {
         <p className="game-status">{getStatusText(state)}</p>
       </header>
 
-      <Board positions={state.positions} />
+      <Board
+        pieces={[
+          { id: 'human', colorIndex: 0, square: state.positions.human, label: 'human' },
+          { id: 'computer', colorIndex: 1, square: state.positions.computer, label: 'computer' }
+        ]}
+      />
 
       <footer className="game-footer">
         <Dice value={state.lastRoll} isRolling={isRolling} canRoll={canRoll} onRoll={roll} />
